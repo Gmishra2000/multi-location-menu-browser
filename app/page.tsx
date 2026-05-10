@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { Location, CatalogItem, CatalogCategory } from './lib/types';
 import { isAvailableAtLocation } from './lib/utils';
+import { isCategoryAvailableNow, getCurrentTime } from './lib/availability';
 import LocationSwitcher from './components/LocationSwitcher';
 import CategoryFilter from './components/CategoryFilter';
 import MenuGrid from './components/MenuGrid';
@@ -16,6 +17,8 @@ export default function Home() {
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
+  const [showUnavailableItems, setShowUnavailableItems] = useState(false); // Time-based filter toggle
+  const [currentTime, setCurrentTime] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +56,14 @@ export default function Home() {
     }
 
     fetchData();
+  }, []);
+
+  // Update current time for display
+  useEffect(() => {
+    const updateTime = () => setCurrentTime(getCurrentTime());
+    updateTime(); // Set immediately
+    const interval = setInterval(updateTime, 60000); // Update every minute
+    return () => clearInterval(interval);
   }, []);
 
   // Helper: Map item names to categories
@@ -104,12 +115,17 @@ export default function Home() {
     return '';
   };
 
-  // Filter items based on selected location and category
+  // Get selected location for timezone
+  const selectedLocation = locations.find(loc => loc.id === selectedLocationId);
+
+  // Filter items based on selected location, category, and time-based availability
   const filteredItems = allItems.filter((item) => {
+    // Filter by location
     const availableAtLocation = selectedLocationId
       ? isAvailableAtLocation(item, selectedLocationId)
       : true;
 
+    // Filter by category
     const matchesCategory = selectedCategoryId === 'all'
       ? true
       : (() => {
@@ -118,10 +134,14 @@ export default function Home() {
           return itemCategoryName === selectedCategory?.categoryData?.name;
         })();
 
-    return availableAtLocation && matchesCategory;
-  });
+    // Filter by time-based availability (if toggle is OFF, hide unavailable items)
+    const itemCategoryName = getCategoryForItem(item);
+    const availableByTime = showUnavailableItems
+      ? true  // Show all items when toggle is ON
+      : isCategoryAvailableNow(itemCategoryName);
 
-  const selectedLocation = locations.find(loc => loc.id === selectedLocationId);
+    return availableAtLocation && matchesCategory && availableByTime;
+  });
 
   if (loading) {
     return <LoadingState />;
@@ -208,11 +228,42 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Time-Based Availability Toggle ⭐ Bonus Feature */}
+        <div className="mb-8 flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <div className="flex items-center gap-3">
+            <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h3 className="font-semibold text-slate-900">Time-Based Filtering</h3>
+              <p className="text-sm text-slate-600">
+                {showUnavailableItems
+                  ? 'Showing all items regardless of time'
+                  : `Only showing items available right now (${currentTime})`}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowUnavailableItems(!showUnavailableItems)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              showUnavailableItems ? 'bg-slate-400' : 'bg-amber-600'
+            }`}
+            aria-label="Toggle time-based filtering"
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                showUnavailableItems ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
         {/* Category Filter */}
         <CategoryFilter
           categories={categories}
           selectedCategoryId={selectedCategoryId}
           onCategoryChange={setSelectedCategoryId}
+          isTimeFilterActive={!showUnavailableItems}
         />
 
         {/* Menu Grid */}

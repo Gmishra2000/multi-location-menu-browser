@@ -27,6 +27,13 @@ export interface Money {
   currency?: string;
 }
 
+// Availability Period (for time-based filtering)
+export interface CatalogAvailabilityPeriod {
+  startLocalTime?: string; // Format: "HH:MM:SS" (e.g., "06:00:00")
+  endLocalTime?: string;   // Format: "HH:MM:SS" (e.g., "11:00:00")
+  dayOfWeek?: 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
+}
+
 // Catalog Item Variation (represents a specific SKU/price point)
 export interface CatalogItemVariation {
   id: string;
@@ -73,8 +80,9 @@ export interface CatalogCategory {
   type: 'CATEGORY';
   categoryData: {
     name?: string;
+    availabilityPeriods?: CatalogAvailabilityPeriod[];
   };
-  // Availability scheduling (for time-based filtering bonus)
+  // Location-based availability
   presentAtAllLocations?: boolean;
   presentAtLocationIds?: string[];
   absentAtLocationIds?: string[];

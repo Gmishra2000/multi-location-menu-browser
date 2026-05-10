@@ -82,27 +82,60 @@ async function seedData() {
       console.log(`   Location 2: Same as Location 1 (only 1 location available)`);
     }
 
-    // Step 2: Create Categories
-    console.log('\n📂 Creating catalog categories...');
+    // Step 2: Create Categories with Time-Based Availability
+    console.log('\n📂 Creating catalog categories with time restrictions...');
 
     const categories = [
-      { name: 'Breakfast', description: 'Morning favorites' },
-      { name: 'Lunch', description: 'Midday meals' },
-      { name: 'Beverages', description: 'Hot and cold drinks' },
-      { name: 'Desserts', description: 'Sweet treats' },
+      {
+        name: 'Breakfast',
+        description: 'Morning favorites',
+        // Available 6 AM - 11 AM every day
+        availabilityPeriods: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(day => ({
+          startLocalTime: '06:00:00',
+          endLocalTime: '11:00:00',
+          dayOfWeek: day,
+        })),
+      },
+      {
+        name: 'Lunch',
+        description: 'Midday meals',
+        // Available 11 AM - 4 PM every day
+        availabilityPeriods: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(day => ({
+          startLocalTime: '11:00:00',
+          endLocalTime: '16:00:00',
+          dayOfWeek: day,
+        })),
+      },
+      {
+        name: 'Beverages',
+        description: 'Hot and cold drinks',
+        // Available all day (no restrictions)
+        availabilityPeriods: undefined,
+      },
+      {
+        name: 'Desserts',
+        description: 'Sweet treats',
+        // Available 2 PM onwards every day
+        availabilityPeriods: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(day => ({
+          startLocalTime: '14:00:00',
+          endLocalTime: '23:59:59',
+          dayOfWeek: day,
+        })),
+      },
     ];
 
     const categoryIds: Record<string, string> = {};
 
     for (const cat of categories) {
       const response = await client.catalog.batchUpsert({
-        idempotencyKey: `cat_${cat.name}_v4`,
+        idempotencyKey: `cat_${cat.name}_v5`, // v5 for availability periods
         batches: [{
           objects: [{
             type: 'CATEGORY',
             id: `#${cat.name}`,
             categoryData: {
               name: cat.name,
+              availabilityPeriods: cat.availabilityPeriods,
             },
           }],
         }],
@@ -112,7 +145,10 @@ async function seedData() {
       const mapping = response.idMappings?.find(m => m.clientObjectId === `#${cat.name}`);
       if (mapping?.objectId) {
         categoryIds[cat.name] = mapping.objectId;
-        console.log(`   ✅ ${cat.name} (ID: ${mapping.objectId})`);
+        const timeInfo = cat.availabilityPeriods
+          ? `(${cat.availabilityPeriods[0].startLocalTime}-${cat.availabilityPeriods[0].endLocalTime})`
+          : '(All day)';
+        console.log(`   ✅ ${cat.name} ${timeInfo}`);
       } else {
         console.error(`   ❌ Failed to get ID for ${cat.name}`);
       }
@@ -209,7 +245,7 @@ async function seedData() {
 
       // Create item with categoryId - using real Square ID (not temp ID)
       const response = await client.catalog.batchUpsert({
-        idempotencyKey: `item_${item.name.replace(/\s/g, '_')}_v4`,
+        idempotencyKey: `item_${item.name.replace(/\s/g, '_')}_v5`, // v5 to match category version
         batches: [{
           objects: [{
             type: 'ITEM',
