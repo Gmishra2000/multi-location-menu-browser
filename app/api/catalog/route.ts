@@ -6,10 +6,9 @@
 
 import { NextResponse } from 'next/server';
 import { squareClient } from '@/app/lib/square';
-import type { CatalogObject } from '@/app/lib/types';
 
 // Helper to convert BigInt to Number for JSON serialization
-function serializeCatalogObject(obj: any): any {
+function serializeCatalogObject(obj: unknown): unknown {
   return JSON.parse(JSON.stringify(obj, (key, value) =>
     typeof value === 'bigint' ? Number(value) : value
   ));
@@ -25,9 +24,43 @@ export async function GET() {
     const catalogArray = response.data ? Object.values(response.data) : [];
     const catalogObjects = catalogArray.filter(Boolean);
 
-    const items = catalogObjects.filter((obj) => obj.type === 'ITEM');
-    const categories = catalogObjects.filter((obj) => obj.type === 'CATEGORY');
+    const allItems = catalogObjects.filter((obj) => obj.type === 'ITEM');
+    const allCategories = catalogObjects.filter((obj) => obj.type === 'CATEGORY');
     const images = catalogObjects.filter((obj) => obj.type === 'IMAGE');
+
+    // Deduplicate items: keep only the most recent version of each item by name
+    const itemsByName = new Map();
+    allItems.forEach((item) => {
+      const itemName = item.itemData?.name;
+      if (!itemName) return;
+
+      const existing = itemsByName.get(itemName);
+      const currentUpdatedAt = new Date(item.updatedAt || 0).getTime();
+      const existingUpdatedAt = existing ? new Date(existing.updatedAt || 0).getTime() : 0;
+
+      if (!existing || currentUpdatedAt > existingUpdatedAt) {
+        itemsByName.set(itemName, item);
+      }
+    });
+
+    const items = Array.from(itemsByName.values());
+
+    // Deduplicate categories: keep only the most recent version of each category by name
+    const categoriesByName = new Map();
+    allCategories.forEach((category) => {
+      const categoryName = category.categoryData?.name;
+      if (!categoryName) return;
+
+      const existing = categoriesByName.get(categoryName);
+      const currentUpdatedAt = new Date(category.updatedAt || 0).getTime();
+      const existingUpdatedAt = existing ? new Date(existing.updatedAt || 0).getTime() : 0;
+
+      if (!existing || currentUpdatedAt > existingUpdatedAt) {
+        categoriesByName.set(categoryName, category);
+      }
+    });
+
+    const categories = Array.from(categoriesByName.values());
 
     // Serialize objects to handle BigInt values
     return NextResponse.json(
@@ -35,7 +68,6 @@ export async function GET() {
         items: serializeCatalogObject(items),
         categories: serializeCatalogObject(categories),
         images: serializeCatalogObject(images),
-        cursor: response._hasNextPage ? 'has_more' : undefined,
       },
       {
         headers: {

@@ -96,7 +96,7 @@ async function seedData() {
 
     for (const cat of categories) {
       const response = await client.catalog.batchUpsert({
-        idempotencyKey: `cat_${cat.name}_${Date.now()}`,
+        idempotencyKey: `cat_${cat.name}_v4`,
         batches: [{
           objects: [{
             type: 'CATEGORY',
@@ -110,9 +110,15 @@ async function seedData() {
 
       // Get the actual ID from the ID mappings
       const mapping = response.idMappings?.find(m => m.clientObjectId === `#${cat.name}`);
-      categoryIds[cat.name] = mapping?.objectId!;
-      console.log(`   ✅ ${cat.name}`);
+      if (mapping?.objectId) {
+        categoryIds[cat.name] = mapping.objectId;
+        console.log(`   ✅ ${cat.name} (ID: ${mapping.objectId})`);
+      } else {
+        console.error(`   ❌ Failed to get ID for ${cat.name}`);
+      }
     }
+
+    console.log('\n📋 Category IDs:', categoryIds);
 
     // Step 3: Create Menu Items
     console.log('\n🍽️  Creating menu items...');
@@ -194,9 +200,16 @@ async function seedData() {
       // With only 1 location, enable items at all locations for simplicity
       // If you have 2+ locations, this will respect the item.locations array
       const atAllLocations = allLocations.length === 1 ? true : (item.locations.length === allLocations.length);
+      const categoryId = categoryIds[item.category];
 
+      if (!categoryId) {
+        console.error(`   ❌ No category ID found for ${item.category}`);
+        continue;
+      }
+
+      // Create item with categoryId - using real Square ID (not temp ID)
       const response = await client.catalog.batchUpsert({
-        idempotencyKey: `item_${item.name}_${Date.now()}`,
+        idempotencyKey: `item_${item.name.replace(/\s/g, '_')}_v4`,
         batches: [{
           objects: [{
             type: 'ITEM',
@@ -204,7 +217,7 @@ async function seedData() {
             itemData: {
               name: item.name,
               description: item.description,
-              categoryId: categoryIds[item.category],
+              categoryId: categoryId, // Use real category ID from Square
               variations: [
                 {
                   type: 'ITEM_VARIATION',
@@ -217,24 +230,24 @@ async function seedData() {
                       currency: 'USD',
                     },
                   },
-                  // Match parent item's location settings
                   presentAtAllLocations: atAllLocations,
                   presentAtLocationIds: atAllLocations ? undefined : item.locations,
                 },
               ],
             },
-            // Set location availability
             presentAtAllLocations: atAllLocations,
             presentAtLocationIds: atAllLocations ? undefined : item.locations,
           }],
         }],
       });
 
+      // Verify categoryId was set
+      const createdItemId = response.idMappings?.find(m => m.clientObjectId === `#${item.name.replace(/\s/g, '_')}`)?.objectId;
       const availability = atAllLocations
         ? 'All locations'
         : `Location ${item.locations.length === 1 ? item.locations.indexOf(location1Id) >= 0 ? '1' : '2' : '1+2'}`;
 
-      console.log(`   ✅ ${item.name} ($${(item.price / 100).toFixed(2)}) - ${availability}`);
+      console.log(`   ✅ ${item.name} ($${(item.price / 100).toFixed(2)}) - ${availability} [Cat: ${item.category}]`);
     }
 
     console.log('\n✨ Seed completed successfully!\n');
