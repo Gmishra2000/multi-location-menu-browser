@@ -30,10 +30,21 @@ export interface Money {
 // Catalog Item Variation (represents a specific SKU/price point)
 export interface CatalogItemVariation {
   id: string;
+  type?: 'ITEM_VARIATION';
   itemId?: string;
   name?: string;
   priceMoney?: Money;
   ordinal?: number;
+  // Square SDK v44 nests variation data inside itemVariationData
+  itemVariationData?: {
+    itemId?: string;
+    name?: string;
+    ordinal?: number;
+    pricingType?: string;
+    priceMoney?: Money;
+    sellable?: boolean;
+    stockable?: boolean;
+  };
 }
 
 // Catalog Item
