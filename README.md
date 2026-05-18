@@ -4,7 +4,7 @@ A production-ready Next.js application integrating with Square's Catalog API to 
 
 ## 🎥 Demo Video
 
-> 📹 **[Watch the walkthrough](LOOM_LINK_HERE)** - 90-second demo of features, architecture, and trade-offs.
+> 📹 **[Watch the walkthrough](https://www.loom.com/share/9c12bd6d46e34d338f2c7199f3da3630)** - 90-second demo of features, architecture, and trade-offs.
 
 ## 🏆 What Makes This Stand Out
 
