@@ -23,6 +23,10 @@ async function seedData() {
   try {
     console.log('🌱 Starting Square Sandbox data seed...\n');
 
+    // Generate unique timestamp for idempotency keys (forces fresh creation)
+    const timestamp = Date.now();
+    console.log(`📌 Using timestamp: ${timestamp}\n`);
+
     // Step 1: Fetch existing locations
     console.log('📍 Fetching locations...');
     const locationsResponse = await client.locations.list();
@@ -128,7 +132,7 @@ async function seedData() {
 
     for (const cat of categories) {
       const response = await client.catalog.batchUpsert({
-        idempotencyKey: `cat_${cat.name}_v5`, // v5 for availability periods
+        idempotencyKey: `cat_${cat.name}_${timestamp}`, // Timestamp ensures uniqueness
         batches: [{
           objects: [{
             type: 'CATEGORY',
@@ -243,9 +247,9 @@ async function seedData() {
         continue;
       }
 
-      // Create item with categoryId - using real Square ID (not temp ID)
+      // Create item with categories array - using current Square API (Dec 2023+)
       const response = await client.catalog.batchUpsert({
-        idempotencyKey: `item_${item.name.replace(/\s/g, '_')}_v5`, // v5 to match category version
+        idempotencyKey: `item_${item.name.replace(/\s/g, '_')}_${timestamp}`, // Timestamp ensures uniqueness
         batches: [{
           objects: [{
             type: 'ITEM',
@@ -254,6 +258,10 @@ async function seedData() {
               name: item.name,
               description: item.description,
               categoryId: categoryId, // Use real category ID from Square
+              categories: [{
+                id: categoryId,
+                ordinal: BigInt(0)  // BigInt required by Square API
+              }],
               variations: [
                 {
                   type: 'ITEM_VARIATION',

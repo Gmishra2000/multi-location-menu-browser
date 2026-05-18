@@ -2,9 +2,11 @@
  * GET /api/catalog
  *
  * Fetches catalog items, categories, and images from Square's Catalog API.
+ * Implements server-side caching to reduce API calls and prevent rate limiting.
  */
 
 import { NextResponse } from 'next/server';
+import { unstable_cache } from 'next/cache';
 import { squareClient } from '@/app/lib/square';
 
 // Helper to convert BigInt to Number for JSON serialization
@@ -14,15 +16,30 @@ function serializeCatalogObject(obj: unknown): unknown {
   ));
 }
 
-export async function GET() {
-  try {
+// Cached Square API call - reduces requests and prevents 429 rate limiting
+// Revalidates every 5 minutes (300 seconds)
+const getCachedCatalog = unstable_cache(
+  async () => {
+    console.log('🔄 Fetching fresh catalog from Square API...');
     const response = await squareClient.catalog.list({
       types: 'ITEM,CATEGORY,IMAGE',
     });
 
     // Square SDK v44+ uses response.data (array-like) not response.objects
     const catalogArray = response.data ? Object.values(response.data) : [];
-    const catalogObjects = catalogArray.filter(Boolean);
+    return catalogArray.filter(Boolean);
+  },
+  ['square-catalog'], // Cache key
+  {
+    revalidate: 300, // 5 minutes
+    tags: ['catalog'], // For manual invalidation via revalidateTag()
+  }
+);
+
+export async function GET() {
+  try {
+    // Use cached data - hits Square API max once every 5 minutes
+    const catalogObjects = await getCachedCatalog();
 
     const allItems = catalogObjects.filter((obj) => obj.type === 'ITEM');
     const allCategories = catalogObjects.filter((obj) => obj.type === 'CATEGORY');

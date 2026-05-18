@@ -67,11 +67,19 @@ export default function Home() {
   }, []);
 
   // Helper: Map item names to categories
-  // NOTE: This is a workaround for Square Sandbox API limitation where categoryId
-  // is not persisted via batchUpsert despite being set correctly in the request.
-  // In production with a real Square account, use item.itemData.categoryId directly.
+  // NOTE: Square updated their Catalog API in Dec 2023 - categoryId (singular) is deprecated.
+  // The current API uses categories (plural, array) to support items in multiple categories.
   const getCategoryForItem = (item: CatalogItem): string => {
-    // First, try to use the categoryId if available (for production Square accounts)
+    // First, try the current API (categories array) - introduced Dec 2023
+    if (item.itemData.categories && item.itemData.categories.length > 0) {
+      const categoryId = item.itemData.categories[0].id;
+      const category = categories.find(c => c.id === categoryId);
+      if (category?.categoryData?.name) {
+        return category.categoryData.name;
+      }
+    }
+
+    // Fallback to deprecated categoryId (for backwards compatibility)
     if (item.itemData.categoryId) {
       const category = categories.find(c => c.id === item.itemData.categoryId);
       if (category?.categoryData?.name) {
@@ -79,7 +87,7 @@ export default function Home() {
       }
     }
 
-    // Fallback: Pattern matching for demo/sandbox environment
+    // Last resort: Pattern matching for demo/sandbox environment
     // This could be extended to parse from item descriptions or other metadata
     const itemName = item.itemData.name?.toLowerCase() || '';
     const description = item.itemData.description?.toLowerCase() || '';

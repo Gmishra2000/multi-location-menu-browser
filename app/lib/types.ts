@@ -54,6 +54,12 @@ export interface CatalogItemVariation {
   };
 }
 
+// Catalog Item Category Reference (for the new categories array API)
+export interface CatalogObjectCategory {
+  id?: string;      // Category ID
+  ordinal?: bigint; // Sort order within the category
+}
+
 // Catalog Item
 export interface CatalogItem {
   id: string;
@@ -61,7 +67,8 @@ export interface CatalogItem {
   itemData: {
     name?: string;
     description?: string;
-    categoryId?: string;
+    categoryId?: string; // Deprecated since Dec 2023 - use categories instead
+    categories?: CatalogObjectCategory[]; // Current API (supports multiple categories)
     variations?: CatalogItemVariation[];
     imageIds?: string[];
     // Location availability fields - critical for filtering
